@@ -2,7 +2,31 @@
 pragma solidity ^0.8.13;
 
 contract MultiCall {
-    /*
+    address[] owners;
+    address deployer;
+
+    constructor() {
+        deployer = msg.sender;
+        owners.push(deployer);
+    }
+
+    error NotAnOwner();
+
+    modifier onlyOwner(address caller) {
+        bool isOwner = false;
+        for (uint256 i = 0; i < owners.length; i++) {
+            if (owners[i] == caller) {
+                isOwner = true;
+                break;
+            }
+        }
+        if (!isOwner) {
+            revert NotAnOwner();
+        }
+        _;
+    }
+
+    /**
      * @notice A single call to target a contract with a given callData
      * @param target The contract to call
      * @param callData The data to pass to the contract
@@ -14,7 +38,7 @@ contract MultiCall {
         bool allowFailure;
     }
 
-    /*
+    /**
      * @notice A single result from a call
      * @param isSuccess Whether the call was successful
      * @param returnData The return data from the call
@@ -24,7 +48,7 @@ contract MultiCall {
         bytes returnData;
     }
 
-    /*
+    /**
      * @notice Aggregate multiple calls into a single call
      * @param calls The calls to aggregate
      * @return blockNumber The block number of the call and returnData The return data of the calls
