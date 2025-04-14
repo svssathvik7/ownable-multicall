@@ -18,6 +18,7 @@ contract MultiCall is ReentrancyGuard {
     error NotAnOwner();
     error SubCallFailure(Call call, Result result);
     error NotDeployer();
+    error ZeroAddress();
 
     event DeployerSet(address indexed newDeployer);
     event OwnerAdded(address indexed owner);
@@ -48,6 +49,13 @@ contract MultiCall is ReentrancyGuard {
     modifier onlyDeployer() {
         if (msg.sender != deployer) {
             revert NotDeployer();
+        }
+        _;
+    }
+
+    modifier noZeroAddress(address user) {
+        if (user == address(0)) {
+            revert ZeroAddress();
         }
         _;
     }
@@ -111,7 +119,9 @@ contract MultiCall is ReentrancyGuard {
      * @notice Add a new owner to the contract, only callable by the deployer
      * @param newOwner New owner to add
      */
-    function addOwner(address newOwner) external onlyDeployer {
+    function addOwner(
+        address newOwner
+    ) external onlyDeployer noZeroAddress(newOwner) {
         owners[newOwner] = true;
         emit OwnerAdded(newOwner);
     }
@@ -120,7 +130,9 @@ contract MultiCall is ReentrancyGuard {
      * @notice Remove an existing owner from the contract, only callable by the deployer
      * @param existingOwner Owner to remove
      */
-    function removeOwner(address existingOwner) external onlyDeployer {
+    function removeOwner(
+        address existingOwner
+    ) external onlyDeployer noZeroAddress(existingOwner) {
         delete owners[existingOwner];
         emit OwnerRemoved(existingOwner);
     }
@@ -141,7 +153,7 @@ contract MultiCall is ReentrancyGuard {
     function drainFunds(
         address recipient,
         address token_address
-    ) external onlyDeployer nonReentrant {
+    ) external onlyDeployer nonReentrant noZeroAddress(recipient) {
         Result memory result;
         uint256 drainAmount;
         if (token_address == address(0)) {
@@ -165,7 +177,9 @@ contract MultiCall is ReentrancyGuard {
      * @notice Change the deployer of the contract
      * @param newDeployer New deployer to set
      */
-    function changeDeployer(address newDeployer) external onlyDeployer {
+    function changeDeployer(
+        address newDeployer
+    ) external onlyDeployer noZeroAddress(newDeployer) {
         deployer = newDeployer;
         if (!owners[newDeployer]) {
             owners[newDeployer] = true;
