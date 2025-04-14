@@ -7,10 +7,12 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 contract MultiCall is ReentrancyGuard {
     mapping(address => bool) private owners;
     address deployer;
+    uint256 public maxCalls;
 
-    constructor() {
+    constructor(uint256 _maxCalls) {
         deployer = msg.sender;
         owners[deployer] = true;
+        maxCalls = _maxCalls;
         emit DeployerSet(deployer);
         emit OwnerAdded(deployer);
     }
@@ -19,6 +21,7 @@ contract MultiCall is ReentrancyGuard {
     error SubCallFailure(Call call, Result result);
     error NotDeployer();
     error ZeroAddress();
+    error TooManyCalls();
 
     event DeployerSet(address indexed newDeployer);
     event OwnerAdded(address indexed owner);
@@ -38,6 +41,7 @@ contract MultiCall is ReentrancyGuard {
         uint256 amount,
         address indexed token
     );
+    event MaxCallsUpdated(uint256 newMaxCalls);
 
     modifier onlyOwner() {
         if (!owners[msg.sender]) {
@@ -56,6 +60,13 @@ contract MultiCall is ReentrancyGuard {
     modifier noZeroAddress(address user) {
         if (user == address(0)) {
             revert ZeroAddress();
+        }
+        _;
+    }
+
+    modifier maxCallsCheck(uint256 callCount) {
+        if (callCount > maxCalls) {
+            revert TooManyCalls();
         }
         _;
     }
@@ -94,6 +105,7 @@ contract MultiCall is ReentrancyGuard {
         external
         onlyOwner
         nonReentrant
+        maxCallsCheck(calls.length)
         returns (uint256 blockNumber, Result[] memory returnData)
     {
         blockNumber = block.number;
@@ -146,7 +158,7 @@ contract MultiCall is ReentrancyGuard {
     }
 
     /**
-     * @notice Drain funds from the contract (destroying contract)
+     * @notice Drain funds from the contract (while destroying contract)
      * @param recipient Address to send funds to
      * @param token_address Address of token to drain, if zero address, Native token holding is drained
      */
@@ -186,6 +198,15 @@ contract MultiCall is ReentrancyGuard {
             emit OwnerAdded(newDeployer);
         }
         emit DeployerSet(newDeployer);
+    }
+
+    /**
+     * @notice Change the max number of calls that can be made in a single aggregate call
+     * @param newMaxCalls New max calls to set
+     */
+    function changeMaxCalls(uint256 newMaxCalls) external onlyOwner {
+        maxCalls = newMaxCalls;
+        emit MaxCallsUpdated(newMaxCalls);
     }
 
     receive() external payable {}
