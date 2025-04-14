@@ -2,6 +2,7 @@
 pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract MultiCall is ReentrancyGuard {
     mapping(address => bool) private owners;
@@ -10,18 +11,31 @@ contract MultiCall is ReentrancyGuard {
     constructor() {
         deployer = msg.sender;
         owners[deployer] = true;
+        emit DeployerSet(deployer);
+        emit OwnerAdded(deployer);
     }
 
     error NotAnOwner();
     error SubCallFailure(Call call, Result result);
     error NotDeployer();
 
+    event DeployerSet(address indexed newDeployer);
     event OwnerAdded(address indexed owner);
     event OwnerRemoved(address indexed owner);
     event AggregateExecuted(
         address indexed caller,
         uint256 callCount,
         uint256 blockNumber
+    );
+    event DrainSuccess(
+        address indexed recipient,
+        uint256 amount,
+        address indexed token
+    );
+    event DrainFailure(
+        address indexed recipient,
+        uint256 amount,
+        address indexed token
     );
 
     modifier onlyOwner() {
@@ -117,6 +131,47 @@ contract MultiCall is ReentrancyGuard {
      */
     function isOwner(address user) external view returns (bool) {
         return owners[user];
+    }
+
+    /**
+     * @notice Drain funds from the contract (destroying contract)
+     * @param recipient Address to send funds to
+     * @param token_address Address of token to drain, if zero address, Native token holding is drained
+     */
+    function drainFunds(
+        address recipient,
+        address token_address
+    ) external onlyDeployer nonReentrant {
+        Result memory result;
+        uint256 drainAmount;
+        if (token_address == address(0)) {
+            drainAmount = address(this).balance;
+            (result.isSuccess, result.returnData) = recipient.call{
+                value: drainAmount
+            }("");
+        } else {
+            IERC20 token = IERC20(token_address);
+            drainAmount = token.balanceOf(address(this));
+            result.isSuccess = token.transfer(recipient, drainAmount);
+        }
+        if (result.isSuccess) {
+            emit DrainSuccess(recipient, drainAmount, token_address);
+        } else {
+            emit DrainFailure(recipient, drainAmount, token_address);
+        }
+    }
+
+    /**
+     * @notice Change the deployer of the contract
+     * @param newDeployer New deployer to set
+     */
+    function changeDeployer(address newDeployer) external onlyDeployer {
+        deployer = newDeployer;
+        if (!owners[newDeployer]) {
+            owners[newDeployer] = true;
+            emit OwnerAdded(newDeployer);
+        }
+        emit DeployerSet(newDeployer);
     }
 
     receive() external payable {}
