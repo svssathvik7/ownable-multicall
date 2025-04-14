@@ -11,6 +11,7 @@ contract MultiCall {
     }
 
     error NotAnOwner();
+    error SubCallFailure(Call call, Result result);
 
     modifier onlyOwner(address caller) {
         bool isOwner = false;
@@ -65,10 +66,9 @@ contract MultiCall {
             (returnData[i].isSuccess, returnData[i].returnData) = call
                 .target
                 .call(call.callData);
-            require(
-                (returnData[i].isSuccess || call.allowFailure),
-                "Multicall: sub-call failed"
-            );
+            if (!(returnData[i].isSuccess || call.allowFailure)) {
+                revert SubCallFailure(call, returnData[i]);
+            }
             unchecked {
                 ++i;
             }
