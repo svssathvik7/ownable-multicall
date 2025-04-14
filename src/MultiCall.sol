@@ -17,16 +17,16 @@ contract MultiCall {
     event OwnerAdded(address indexed owner);
     event OwnerRemoved(address indexed owner);
 
-    modifier onlyOwner(address caller) {
-        bool isOwner = owners[caller];
+    modifier onlyOwner() {
+        bool isOwner = owners[msg.sender];
         if (!isOwner) {
             revert NotAnOwner();
         }
         _;
     }
 
-    modifier onlyDeployer(address caller) {
-        if (caller != deployer) {
+    modifier onlyDeployer() {
+        if (msg.sender != deployer) {
             revert NotDeployer();
         }
         _;
@@ -63,7 +63,7 @@ contract MultiCall {
         Call[] calldata calls
     )
         external
-        onlyOwner(msg.sender)
+        onlyOwner
         returns (uint256 blockNumber, Result[] memory returnData)
     {
         blockNumber = block.number;
@@ -88,7 +88,7 @@ contract MultiCall {
      * @notice Add a new owner to the contract, only callable by the deployer
      * @param newOwner New owner to add
      */
-    function addOwner(address newOwner) external onlyDeployer(msg.sender) {
+    function addOwner(address newOwner) external onlyDeployer {
         owners[newOwner] = true;
         emit OwnerAdded(newOwner);
     }
@@ -97,9 +97,7 @@ contract MultiCall {
      * @notice Remove an existing owner from the contract, only callable by the deployer
      * @param existingOwner Owner to remove
      */
-    function removeOwner(
-        address existingOwner
-    ) external onlyDeployer(msg.sender) {
+    function removeOwner(address existingOwner) external onlyDeployer {
         delete owners[existingOwner];
         emit OwnerRemoved(existingOwner);
     }
