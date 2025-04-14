@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract MultiCall is ReentrancyGuard {
     mapping(address => bool) private owners;
-    address deployer;
+    address public deployer;
     uint256 public maxCalls;
 
     constructor(uint256 _maxCalls) {

@@ -12,7 +12,7 @@ contract CounterScript is Script {
     function run() public {
         vm.startBroadcast();
 
-        counter = new MultiCall();
+        counter = new MultiCall(1000);
 
         vm.stopBroadcast();
     }
