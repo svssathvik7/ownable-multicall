@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
+
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract MultiCall {
+contract MultiCall is ReentrancyGuard {
     mapping(address => bool) private owners;
     address deployer;
 
@@ -17,10 +18,14 @@ contract MultiCall {
 
     event OwnerAdded(address indexed owner);
     event OwnerRemoved(address indexed owner);
+    event AggregateExecuted(
+        address indexed caller,
+        uint256 callCount,
+        uint256 blockNumber
+    );
 
     modifier onlyOwner() {
-        bool isOwner = owners[msg.sender];
-        if (!isOwner) {
+        if (!owners[msg.sender]) {
             revert NotAnOwner();
         }
         _;
@@ -43,6 +48,7 @@ contract MultiCall {
         address target;
         bytes callData;
         bool allowFailure;
+        uint256 value;
     }
 
     /**
@@ -65,17 +71,17 @@ contract MultiCall {
     )
         external
         onlyOwner
+        nonReentrant
         returns (uint256 blockNumber, Result[] memory returnData)
     {
         blockNumber = block.number;
         uint256 length = calls.length;
         returnData = new Result[](length);
-        Call calldata call;
         for (uint256 i = 0; i < length; ) {
-            call = calls[i];
+            Call calldata call = calls[i];
             (returnData[i].isSuccess, returnData[i].returnData) = call
                 .target
-                .call(call.callData);
+                .call{value: call.value}(call.callData);
             if (!(returnData[i].isSuccess || call.allowFailure)) {
                 revert SubCallFailure(call, returnData[i]);
             }
@@ -83,6 +89,8 @@ contract MultiCall {
                 ++i;
             }
         }
+        emit AggregateExecuted(msg.sender, length, blockNumber);
+        return (blockNumber, returnData);
     }
 
     /**
@@ -102,4 +110,14 @@ contract MultiCall {
         delete owners[existingOwner];
         emit OwnerRemoved(existingOwner);
     }
+
+    /**
+     * @notice View function to check if an address is an owner
+     * @param user Address to check owner status
+     */
+    function isOwner(address user) external view returns (bool) {
+        return owners[user];
+    }
+
+    receive() external payable {}
 }
